@@ -10,6 +10,26 @@ import requests
 USERNAME=config.USERNAME
 PASSWORD=config.PASSWORD
 
+def getLodgingCountries(l):
+    if isinstance(l, dict):
+        # Single lodging present so wrap in a list
+        l = [l]
+    countries = []
+    for m in l:
+        try:
+            country = m['Address']['country']
+        except KeyError:
+            try:
+                # Use the last word in the address string
+                country = m['Address']['address'].split()[-1]
+            except KeyError:
+                country = 'Unknown'
+        countries.append(country)
+    # Dedupe and flatten
+    countriesList = list(dict.fromkeys(countries))
+    countriesString = ', '.join([str(x) for x in countriesList])
+    return(countriesString)
+
 response = requests.get('https://api.tripit.com/v1/list/trip/past/true/format/json', auth=(USERNAME,PASSWORD))
 pastTrips = response.json()
 pages = int(pastTrips['max_page'])
@@ -35,6 +55,20 @@ allPastTrips['non_present_days'].clip(lower=0,inplace=True)
 
 # Filter to international trips
 allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.country'] !='US',['id','display_name','primary_location','PrimaryLocationAddress.country','start_date','end_date','non_present_days']]
+
+# Add lodging countries for international trips
+tripLodgingLocations = {}
+print('Extracting country information from lodging details)
+for i in tqdm(allPastInternationalTrips['id'].to_list()):
+    response = requests.get('https://api.tripit.com/v1/get/trip/id/{0}/include_objects/true/format/json'.format(i), auth=(USERNAME,PASSWORD))
+    try:
+        lodging = response.json()['LodgingObject']
+        lodgingLocation = getLodgingCountries(lodging)
+        tripLodgingLocations[str(i)] = lodgingLocation
+    except KeyError:
+        # No lodging
+        None
+allPastInternationalTrips['lodgingCountries']=allPastInternationalTrips['id'].map(tripLodgingLocations)
 
 # Write outputs to an Excel document
 with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:  
