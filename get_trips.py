@@ -58,7 +58,7 @@ allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.
 
 # Add lodging countries for international trips
 tripLodgingLocations = {}
-print('Extracting country information from lodging details)
+print('Extracting country information from lodging details')
 for i in tqdm(allPastInternationalTrips['id'].to_list()):
     response = requests.get('https://api.tripit.com/v1/get/trip/id/{0}/include_objects/true/format/json'.format(i), auth=(USERNAME,PASSWORD))
     try:
