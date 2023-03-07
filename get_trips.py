@@ -19,16 +19,11 @@ def getLodgingCountries(l):
         try:
             country = m['Address']['country']
         except KeyError:
-            try:
-                # Use the last word in the address string
-                country = m['Address']['address'].split()[-1]
-            except KeyError:
-                country = 'Unknown'
+            country = 'Unknown'
         countries.append(country)
     # Dedupe and flatten
     countriesList = list(dict.fromkeys(countries))
-    countriesString = ', '.join([str(x) for x in countriesList])
-    return(countriesString)
+    return(countriesList)
 
 response = requests.get('https://api.tripit.com/v1/list/trip/past/true/format/json', auth=(USERNAME,PASSWORD))
 pastTrips = response.json()
@@ -69,6 +64,10 @@ for i in tqdm(allPastInternationalTrips['id'].to_list()):
         # No lodging
         None
 allPastInternationalTrips['lodgingCountries']=allPastInternationalTrips['id'].map(tripLodgingLocations)
+
+# Create a column containing all countries on the trip, both flight and lodging
+allPastInternationalTrips['PrimaryLocationAddress.allCountries'] = [v[pd.notna(v)] for v in allPastInternationalTrips[['PrimaryLocationAddress.country','lodgingCountries']].values]
+allPastInternationalTrips['PrimaryLocationAddress.allCountries'] = allPastInternationalTrips['PrimaryLocationAddress.allCountries'].apply(lambda x: list(pd.core.common.flatten(x))).apply(set).apply(list)
 
 # Write outputs to an Excel document
 with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:  
