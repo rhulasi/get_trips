@@ -3,6 +3,7 @@
 from datetime import timedelta
 from tqdm import tqdm
 import config
+import country_converter as coco
 import json
 import pandas as pd
 import requests
@@ -48,8 +49,11 @@ allPastTrips['non_present_days'] = (allPastTrips['end_date'] - allPastTrips['sta
 # Account for same day trips
 allPastTrips['non_present_days'].clip(lower=0,inplace=True)
 
+# Add URL to the trip
+allPastTrips['trip_url']='https://www.tripit.com/app/trips/' + allPastTrips['id']
+
 # Filter to international trips
-allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.country'] !='US',['id','display_name','primary_location','PrimaryLocationAddress.country','start_date','end_date','non_present_days']]
+allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.country'] !='US',['id','trip_url','display_name','primary_location','PrimaryLocationAddress.country','start_date','end_date','non_present_days']]
 
 # Add lodging countries for international trips
 tripLodgingLocations = {}
@@ -66,10 +70,24 @@ for i in tqdm(allPastInternationalTrips['id'].to_list()):
 allPastInternationalTrips['lodgingCountries']=allPastInternationalTrips['id'].map(tripLodgingLocations)
 
 # Create a column containing all countries on the trip, both flight and lodging
-allPastInternationalTrips['PrimaryLocationAddress.allCountries'] = [v[pd.notna(v)] for v in allPastInternationalTrips[['PrimaryLocationAddress.country','lodgingCountries']].values]
-allPastInternationalTrips['PrimaryLocationAddress.allCountries'] = allPastInternationalTrips['PrimaryLocationAddress.allCountries'].apply(lambda x: list(pd.core.common.flatten(x))).apply(set).apply(list)
+allPastInternationalTrips['allCountries'] = [v[pd.notna(v)] for v in allPastInternationalTrips[['PrimaryLocationAddress.country','lodgingCountries']].values]
+allPastInternationalTrips['allCountries'] = allPastInternationalTrips['allCountries'].apply(lambda x: list(pd.core.common.flatten(x))).apply(set).apply(list)
 
+# Replace country codes with names and flatten
+print('Looking up country codes')
+allPastInternationalTrips['allCountries'] = allPastInternationalTrips['allCountries'].apply(lambda x: coco.convert(names=x, to='name_short'))
+allPastInternationalTrips['allCountries'] = allPastInternationalTrips['allCountries'].apply(lambda x: x if isinstance(x, str) else ', '.join([str(y) for y in x]))
+
+print('Writing output')
 # Write outputs to an Excel document
 with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:  
-    allPastInternationalTrips.to_excel(writer, sheet_name='All Past International Trips')
+    allPastInternationalTrips.to_excel(writer, sheet_name='All Past International Trips',freeze_panes=(1,0),\
+                                       columns=['id','trip_url','display_name','primary_location',\
+                                                'PrimaryLocationAddress.country','lodgingCountries',\
+                                                'start_date','end_date','allCountries','non_present_days'])
+    # Dynamically set column width
+    for i, col in enumerate(allPastInternationalTrips.columns):
+        column_len = max(allPastInternationalTrips[col].astype(str).str.len().max(), len(col) + 2)
+        writer.sheets['All Past International Trips'].set_column(i, i, column_len)
     allPastTrips.to_excel(writer, sheet_name='All Past Trips')
+print('Done!')
