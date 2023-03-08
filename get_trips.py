@@ -91,12 +91,12 @@ allPastInternationalTrips['allCountries'] = allPastInternationalTrips['allCountr
 print('Writing output')
 # Write outputs to an Excel document
 with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:  
-    allPastInternationalTrips.to_excel(writer, sheet_name='All Past International Trips',\
+    allPastInternationalTrips.to_excel(writer, sheet_name='All Past International Trips',freeze_panes=(1,0),\
                                        columns=['id','trip_url','display_name','primary_location',\
                                                 'PrimaryLocationAddress.country','lodgingCountries',\
                                                 'start_date','end_date','allCountries','non_present_days'])
-    allPastTrips.to_excel(writer, sheet_name='All Past Trips')
-    tripsWithUnknownLocations.to_excel(writer, sheet_name='Trips with unknown locations',\
+    allPastTrips.to_excel(writer, sheet_name='All Past Trips',freeze_panes=(1,0))
+    tripsWithUnknownLocations.to_excel(writer, sheet_name='Trips with unknown locations',freeze_panes=(1,0),\
                                       columns=['id', 'trip_id','display_name','Address.address','Address.city',\
                                                'Address.state','Address.zip','Address.country','Address.addr1',\
                                                'Address.addr2','trip_url'])
