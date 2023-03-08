@@ -73,10 +73,6 @@ for i in tqdm(allPastInternationalTrips['id'].to_list()):
         # No lodging
         None
 
-tripsWithUnknownLocations = pd.concat(tripsWithUnknownLocations,ignore_index=True)
-tripsWithUnknownLocations = tripsWithUnknownLocations[tripsWithUnknownLocations['Address.country'].isnull()]
-tripsWithUnknownLocations['trip_url']='https://www.tripit.com/app/trips/' + tripsWithUnknownLocations['trip_id']
-
 allPastInternationalTrips['lodgingCountries']=allPastInternationalTrips['id'].map(tripLodgingLocations)
 
 # Create a column containing all countries on the trip, both flight and lodging
@@ -96,8 +92,10 @@ with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:
                                                 'PrimaryLocationAddress.country','lodgingCountries',\
                                                 'start_date','end_date','allCountries','non_present_days'])
     allPastTrips.to_excel(writer, sheet_name='All Past Trips',freeze_panes=(1,0))
-    tripsWithUnknownLocations.to_excel(writer, sheet_name='Trips with unknown locations',freeze_panes=(1,0),\
-                                      columns=['id', 'trip_id','display_name','Address.address','Address.city',\
-                                               'Address.state','Address.zip','Address.country','Address.addr1',\
-                                               'Address.addr2','trip_url'])
+    if len(tripsWithUnknownLocations)>0:
+        tripsWithUnknownLocations = pd.concat(tripsWithUnknownLocations,ignore_index=True)
+        tripsWithUnknownLocations = tripsWithUnknownLocations[tripsWithUnknownLocations['Address.country'].isnull()]
+        tripsWithUnknownLocations['trip_url']='https://www.tripit.com/app/trips/' + tripsWithUnknownLocations['trip_id']
+        tripsWithUnknownLocations.to_excel(writer, sheet_name='Trips with unknown locations',freeze_panes=(1,0),\
+                                      columns=['id', 'trip_id','display_name','Address.address','Address.country','trip_url'])
 print('Done!')
