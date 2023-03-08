@@ -57,16 +57,26 @@ allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.
 
 # Add lodging countries for international trips
 tripLodgingLocations = {}
+tripsWithUnknownLocations = []
 print('Extracting country information from lodging details')
 for i in tqdm(allPastInternationalTrips['id'].to_list()):
     response = requests.get('https://api.tripit.com/v1/get/trip/id/{0}/include_objects/true/format/json'.format(i), auth=(USERNAME,PASSWORD))
     try:
         lodging = response.json()['LodgingObject']
         lodgingLocation = getLodgingCountries(lodging)
+        if 'Unknown' in lodgingLocation:
+            # Capture details of unknown lodging locations for remediation
+            df = pd.json_normalize(lodging)
+            tripsWithUnknownLocations.append(df)
         tripLodgingLocations[str(i)] = lodgingLocation
     except KeyError:
         # No lodging
         None
+
+tripsWithUnknownLocations = pd.concat(tripsWithUnknownLocations,ignore_index=True)
+tripsWithUnknownLocations = tripsWithUnknownLocations[tripsWithUnknownLocations['Address.country'].isnull()]
+tripsWithUnknownLocations['trip_url']='https://www.tripit.com/app/trips/' + tripsWithUnknownLocations['trip_id']
+
 allPastInternationalTrips['lodgingCountries']=allPastInternationalTrips['id'].map(tripLodgingLocations)
 
 # Create a column containing all countries on the trip, both flight and lodging
@@ -81,13 +91,13 @@ allPastInternationalTrips['allCountries'] = allPastInternationalTrips['allCountr
 print('Writing output')
 # Write outputs to an Excel document
 with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:  
-    allPastInternationalTrips.to_excel(writer, sheet_name='All Past International Trips',freeze_panes=(1,0),\
+    allPastInternationalTrips.to_excel(writer, sheet_name='All Past International Trips',\
                                        columns=['id','trip_url','display_name','primary_location',\
                                                 'PrimaryLocationAddress.country','lodgingCountries',\
                                                 'start_date','end_date','allCountries','non_present_days'])
-    # Dynamically set column width
-    for i, col in enumerate(allPastInternationalTrips.columns):
-        column_len = max(allPastInternationalTrips[col].astype(str).str.len().max(), len(col) + 2)
-        writer.sheets['All Past International Trips'].set_column(i, i, column_len)
     allPastTrips.to_excel(writer, sheet_name='All Past Trips')
+    tripsWithUnknownLocations.to_excel(writer, sheet_name='Trips with unknown locations',\
+                                      columns=['id', 'trip_id','display_name','Address.address','Address.city',\
+                                               'Address.state','Address.zip','Address.country','Address.addr1',\
+                                               'Address.addr2','trip_url'])
 print('Done!')
