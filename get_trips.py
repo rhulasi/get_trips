@@ -40,7 +40,7 @@ for i in tqdm(range(1,pages+1)):
         # Single trip returned so we need to wrap it in a list to enable dataframe conversion
         singleTrip = []
         singleTrip.append(response.json()['Trip'])
-        output['Trip']=singleTrip
+        output['Trip'] = singleTrip
     df = pd.json_normalize(output,record_path=['Trip'])
     allPastTrips.append(df)
 allPastTrips = pd.concat(allPastTrips,ignore_index=True)
