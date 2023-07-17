@@ -35,7 +35,13 @@ print('{0} pages of trips to retrieve'.format(pages))
 allPastTrips = []
 for i in tqdm(range(1,pages+1)):
     response = requests.get('https://api.tripit.com/v1/list/trip/past/true/format/json/page_num/{0}'.format(i), auth=(USERNAME,PASSWORD))
-    df = pd.json_normalize(response.json(),record_path=['Trip'])
+    output = response.json()
+    if isinstance(output['Trip'], dict):
+        # Single trip returned so we need to wrap it in a list to enable dataframe conversion
+        singleTrip = []
+        singleTrip.append(response.json()['Trip'])
+        output['Trip']=singleTrip
+    df = pd.json_normalize(output,record_path=['Trip'])
     allPastTrips.append(df)
 allPastTrips = pd.concat(allPastTrips,ignore_index=True)
 
