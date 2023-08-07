@@ -45,6 +45,9 @@ for i in tqdm(range(1,pages+1)):
     allPastTrips.append(df)
 allPastTrips = pd.concat(allPastTrips,ignore_index=True)
 
+# Sort descending by end date because API returns in order of TripID
+allPastTrips.sort_values(by=['end_date'],ascending=False,inplace=True)
+
 # Convert dates
 allPastTrips[['start_date','end_date']] = allPastTrips[['start_date','end_date']].apply(pd.to_datetime)
 
