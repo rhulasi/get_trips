@@ -51,18 +51,18 @@ allPastTrips.sort_values(by=['end_date'],ascending=False,inplace=True)
 # Convert dates
 allPastTrips[['start_date','end_date']] = allPastTrips[['start_date','end_date']].apply(pd.to_datetime)
 
-# Calculate days not present in USA (departure and return days not included as per:)
-# https://www.uscis.gov/policy-manual/volume-12-part-d-chapter-4#
-allPastTrips['non_present_days'] = (allPastTrips['end_date'] - allPastTrips['start_date'] - timedelta(days=1)).dt.days
-
-# Account for same day trips
-allPastTrips['non_present_days'].clip(lower=0,inplace=True)
-
 # Add URL to the trip
 allPastTrips['trip_url']='https://www.tripit.com/app/trips/' + allPastTrips['id']
 
 # Filter to international trips
-allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.country'] !='US',['id','trip_url','display_name','primary_location','PrimaryLocationAddress.country','start_date','end_date','non_present_days']]
+allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.country'] !='US',['id','trip_url','display_name','primary_location','PrimaryLocationAddress.country','start_date','end_date']]
+
+# Calculate days not present in USA (departure and return days not included as per:)
+# https://www.uscis.gov/policy-manual/volume-12-part-d-chapter-4#
+allPastInternationalTrips['non_present_days'] = (allPastInternationalTrips['end_date'] - allPastInternationalTrips['start_date'] - timedelta(days=1)).dt.days
+
+# Account for same day trips
+allPastInternationalTrips['non_present_days'].clip(lower=0,inplace=True)
 
 # Add lodging countries for international trips
 tripLodgingLocations = {}
