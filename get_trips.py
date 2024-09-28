@@ -28,11 +28,19 @@ def getFlights(air):
                 # No airline code
                 airline='XX'
             flight_no=airline+f['marketing_flight_number']
+            
+            # Get seat information at time of booking
+            try:
+                seat=(f['seats'])
+            except KeyError:
+                # No seat
+                seat='XX'
 
             flight={}
             flight['flight_no']=flight_no
             flight['date']=f['StartDateTime']['date']
             flight['route']=f['start_airport_code']+'-'+f['end_airport_code']
+            flight['seat']=seat
             flights.append(flight)
     return(flights)
 
@@ -132,7 +140,7 @@ allPastInternationalTrips['non_present_days'].clip(lower=0,inplace=True)
 print('Writing output')
 # Write outputs to an Excel document
 with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:  
-    allPastInternationalTrips.to_excel(writer, sheet_name='All Past International Trips',freeze_panes=(1,0),\
+    allPastInternationalTrips.to_excel(writer,sheet_name='All Past International Trips',freeze_panes=(1,0),\
                                        columns=['id','trip_url','display_name','primary_location',\
                                                 'PrimaryLocationAddress.country','lodgingCountries',\
                                                 'start_date','end_date','allCountries','non_present_days'])
@@ -141,9 +149,9 @@ with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:
         tripsWithUnknownLocations = pd.concat(tripsWithUnknownLocations,ignore_index=True)
         tripsWithUnknownLocations = tripsWithUnknownLocations[tripsWithUnknownLocations['Address.country'].isnull()]
         tripsWithUnknownLocations['trip_url']='https://www.tripit.com/app/trips/' + tripsWithUnknownLocations['trip_id']
-        tripsWithUnknownLocations.to_excel(writer, sheet_name='Trips with unknown locations',freeze_panes=(1,0),\
+        tripsWithUnknownLocations.to_excel(writer,sheet_name='Trips with unknown locations',freeze_panes=(1,0),\
                                       columns=['id', 'trip_id','display_name','Address.address','Address.country','trip_url'])
     allFlights = pd.concat(allFlights,ignore_index=True)
-    allFlights.to_excel(writer, sheet_name='All Flights',freeze_panes=(1,0),columns=['date','flight_no','route'])
+    allFlights.to_excel(writer,sheet_name='All Flights',freeze_panes=(1,0),columns=['date','flight_no','route','seat'])
 
 print('Done!')
