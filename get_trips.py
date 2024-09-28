@@ -31,16 +31,16 @@ def getFlights(air):
             
             # Get seat information at time of booking
             try:
-                seat=(f['seats'])
+                seats=(f['seats'])
             except KeyError:
                 # No seat
-                seat='XX'
+                seats='XX'
 
             flight={}
             flight['flight_no']=flight_no
             flight['date']=f['StartDateTime']['date']
             flight['route']=f['start_airport_code']+'-'+f['end_airport_code']
-            flight['seat']=seat
+            flight['seats']=seats
             flights.append(flight)
     return(flights)
 
@@ -152,6 +152,6 @@ with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:
         tripsWithUnknownLocations.to_excel(writer,sheet_name='Trips with unknown locations',freeze_panes=(1,0),\
                                       columns=['id', 'trip_id','display_name','Address.address','Address.country','trip_url'])
     allFlights = pd.concat(allFlights,ignore_index=True)
-    allFlights.to_excel(writer,sheet_name='All Flights',freeze_panes=(1,0),columns=['date','flight_no','route','seat'])
+    allFlights.to_excel(writer,sheet_name='All Flights',freeze_panes=(1,0),columns=['date','flight_no','route','seats'])
 
 print('Done!')
