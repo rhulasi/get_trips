@@ -11,6 +11,31 @@ import requests
 USERNAME=config.USERNAME
 PASSWORD=config.PASSWORD
 
+def getFlights(air):
+    flights=[]
+    if isinstance(air,dict):
+        air = [air]
+    for a in air:
+        s=a['Segment']
+        if isinstance(s, dict):
+            # Single flight segment present so wrap in a list
+            s = [s]
+        for f in s:
+            # Airline code is missing in some occasions
+            try:
+                airline=(f['marketing_airline_code'])
+            except KeyError:
+                # No airline code
+                airline='XX'
+            flight_no=airline+f['marketing_flight_number']
+
+            flight={}
+            flight['flight_no']=flight_no
+            flight['date']=f['StartDateTime']['date']
+            flight['route']=f['start_airport_code']+'-'+f['end_airport_code']
+            flights.append(flight)
+    return(flights)
+
 def getLodgingCountries(l):
     if isinstance(l, dict):
         # Single lodging present so wrap in a list
@@ -54,21 +79,12 @@ allPastTrips[['start_date','end_date']] = allPastTrips[['start_date','end_date']
 # Add URL to the trip
 allPastTrips['trip_url']='https://www.tripit.com/app/trips/' + allPastTrips['id']
 
-# Filter to international trips
-allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.country'] !='US',['id','trip_url','display_name','primary_location','PrimaryLocationAddress.country','start_date','end_date']]
-
-# Calculate days not present in USA (departure and return days not included as per:)
-# https://www.uscis.gov/policy-manual/volume-12-part-d-chapter-4#
-allPastInternationalTrips['non_present_days'] = (allPastInternationalTrips['end_date'] - allPastInternationalTrips['start_date'] - timedelta(days=1)).dt.days
-
-# Account for same day trips
-allPastInternationalTrips['non_present_days'].clip(lower=0,inplace=True)
-
-# Add lodging countries for international trips
+# Add lodging countries for trips and get flight information
 tripLodgingLocations = {}
 tripsWithUnknownLocations = []
-print('Extracting country information from lodging details')
-for i in tqdm(allPastInternationalTrips['id'].to_list()):
+allFlights = []
+print('Extracting country information from lodging details and flight info')
+for i in tqdm(allPastTrips['id'].to_list()):
     response = requests.get('https://api.tripit.com/v1/get/trip/id/{0}/include_objects/true/format/json'.format(i), auth=(USERNAME,PASSWORD))
     try:
         lodging = response.json()['LodgingObject']
@@ -81,17 +97,37 @@ for i in tqdm(allPastInternationalTrips['id'].to_list()):
     except KeyError:
         # No lodging
         None
+    try:
+        air = response.json()['AirObject']
+        flights = getFlights(air)
+        df = pd.json_normalize(flights)
+        allFlights.append(df)
+    except KeyError:
+        # No flights
+        None
 
-allPastInternationalTrips['lodgingCountries']=allPastInternationalTrips['id'].map(tripLodgingLocations)
+allPastTrips['lodgingCountries']=allPastTrips['id'].map(tripLodgingLocations)
 
 # Create a column containing all countries on the trip, both flight and lodging
-allPastInternationalTrips['allCountries'] = [v[pd.notna(v)] for v in allPastInternationalTrips[['PrimaryLocationAddress.country','lodgingCountries']].values]
-allPastInternationalTrips['allCountries'] = allPastInternationalTrips['allCountries'].apply(lambda x: list(pd.core.common.flatten(x))).apply(set).apply(list)
+allPastTrips['allCountries'] = [v[pd.notna(v)] for v in allPastTrips[['PrimaryLocationAddress.country','lodgingCountries']].values]
+allPastTrips['allCountries'] = allPastTrips['allCountries'].apply(lambda x: list(pd.core.common.flatten(x))).apply(set).apply(list)
 
 # Replace country codes with names and flatten
 print('Looking up country codes')
-allPastInternationalTrips['allCountries'] = allPastInternationalTrips['allCountries'].apply(lambda x: coco.convert(names=x, to='name_short'))
-allPastInternationalTrips['allCountries'] = allPastInternationalTrips['allCountries'].apply(lambda x: x if isinstance(x, str) else ', '.join([str(y) for y in x]))
+allPastTrips['allCountries'] = allPastTrips['allCountries'].apply(lambda x: coco.convert(names=x, to='name_short'))
+allPastTrips['allCountries'] = allPastTrips['allCountries'].apply(lambda x: x if isinstance(x, str) else ', '.join([str(y) for y in x]))
+
+# Filter to international trips
+allPastInternationalTrips=allPastTrips.loc[allPastTrips['PrimaryLocationAddress.country'] !='US',['id','trip_url','display_name','primary_location',
+                                                                                                  'PrimaryLocationAddress.country','lodgingCountries',
+                                                                                                  'allCountries','start_date','end_date']]
+
+# Calculate days not present in USA (departure and return days not included as per:)
+# https://www.uscis.gov/policy-manual/volume-12-part-d-chapter-4#
+allPastInternationalTrips['non_present_days'] = (allPastInternationalTrips['end_date'] - allPastInternationalTrips['start_date'] - timedelta(days=1)).dt.days
+
+# Account for same day trips
+allPastInternationalTrips['non_present_days'].clip(lower=0,inplace=True)
 
 print('Writing output')
 # Write outputs to an Excel document
@@ -107,4 +143,7 @@ with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:
         tripsWithUnknownLocations['trip_url']='https://www.tripit.com/app/trips/' + tripsWithUnknownLocations['trip_id']
         tripsWithUnknownLocations.to_excel(writer, sheet_name='Trips with unknown locations',freeze_panes=(1,0),\
                                       columns=['id', 'trip_id','display_name','Address.address','Address.country','trip_url'])
+    allFlights = pd.concat(allFlights,ignore_index=True)
+    allFlights.to_excel(writer, sheet_name='All Flights',freeze_panes=(1,0),columns=['date','flight_no','route'])
+
 print('Done!')
