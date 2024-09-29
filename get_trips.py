@@ -21,23 +21,34 @@ def getFlights(air):
             # Single flight segment present so wrap in a list
             s = [s]
         for f in s:
-            # Airline code is missing in some occasions
+            flight={}
+            # Try the operating airline first, then codeshare
             try:
-                airline=(f['marketing_airline_code'])
+                airline=(f['operating_airline_code'])
+                flight_no=airline+f['operating_flight_number']
             except KeyError:
-                # No airline code
-                airline='XX'
-            flight_no=airline+f['marketing_flight_number']
+                try:
+                    airline=(f['marketing_airline_code'])
+                    flight_no=airline+f['marketing_flight_number']
+                except KeyError:
+                    # No airline code
+                    flight_no='Unspecified'
             
             # Get seat information at time of booking
             try:
                 seats=(f['seats'])
             except KeyError:
                 # No seat
-                seats='XX'
-
-            flight={}
+                seats='Unspecified'
+            try:
+                flight['aircraft']=f['aircraft']
+            except KeyError:
+                flight['aircraft']='Unspecified'
+            
+            flight['trip_id']=a['trip_id']
+            flight['flight_id']=f['id']
             flight['flight_no']=flight_no
+            
             flight['date']=f['StartDateTime']['date']
             flight['route']=f['start_airport_code']+'-'+f['end_airport_code']
             flight['seats']=seats
@@ -152,6 +163,6 @@ with pd.ExcelWriter('PastTrips.xlsx',engine='xlsxwriter') as writer:
         tripsWithUnknownLocations.to_excel(writer,sheet_name='Trips with unknown locations',freeze_panes=(1,0),\
                                       columns=['id', 'trip_id','display_name','Address.address','Address.country','trip_url'])
     allFlights = pd.concat(allFlights,ignore_index=True)
-    allFlights.to_excel(writer,sheet_name='All Flights',freeze_panes=(1,0),columns=['date','flight_no','route','seats'])
+    allFlights.to_excel(writer,sheet_name='All Flights',freeze_panes=(1,0),columns=['trip_id','flight_id','date','flight_no','route','aircraft','seats'])
 
 print('Done!')
